@@ -71,6 +71,26 @@ function GetAll-Customers () {
     
 }
 
+function Get-SyncroAssets () {
+ 
+    [cmdletbinding()]
+    
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$SyncroSubdomain,
+        [string]$SyncroAPIKey,
+        [string]$page
+    )
+    
+    
+    $uri = "https://$SyncroSubdomain.syncromsp.com/api/v1/customer_assets?api_key=$SyncroAPIKey&customer_id=$customer_id"
+    $response = Invoke-RestMethod -Uri $uri
+    $response = $response.ToString().Replace("AV", "_AV") | ConvertFrom-Json
+    $response
+    
+}
+
 ###Fnd All Syncro Customers##########
 Write-Host "Getting All Customers In Syncro"
 
@@ -82,14 +102,22 @@ Write-Host "Found $($SyncroCustomers.Count) Customers in Syncro" -ForegroundColo
 
 
 
+
 foreach ($customer in $SyncroCustomers) {
     $customer_id = $customer.id
     $customername = $customer.business_and_full_name
 
     #connect to syncro and pull all assets for the customer by ID
-    $uri = "https://$SyncroSubdomain.syncromsp.com/api/v1/customer_assets?api_key=$SyncroAPIKey&customer_id=$customer_id"
-    $response = Invoke-RestMethod -Uri $uri
-    $data = $response.ToString().Replace("AV", "_AV") | ConvertFrom-Json
+
+    Write-Host "Getting All assets for $customername In Syncro"
+
+    $page = 1
+    $totalPageCount = (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -page 1).meta.total_pages
+    $SyncroAssets = Do {
+        (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -page $page).assets
+        $page = $page + 1
+    }Until ($page -gt $totalPageCount)
+    Write-Host "Found $($SyncroAssets.Count) assets in Syncro" -ForegroundColor Green
 
     foreach ($d in $data.assets) {
         if ($d.properties.kabuto_information.general.manufacturer -like "*dell*") {
