@@ -80,17 +80,17 @@ function Get-SyncroAssets () {
         [Parameter(Mandatory = $true)]
         [string]$SyncroSubdomain,
         [string]$SyncroAPIKey,
-        [string]$page
+        [string]$page,
+        [string]$customer_id
     )
     
     
-    $uri = "https://$SyncroSubdomain.syncromsp.com/api/v1/customer_assets?api_key=$SyncroAPIKey&customer_id=$customer_id"
+    $uri = "https://$SyncroSubdomain.syncromsp.com/api/v1/customer_assets?api_key=$SyncroAPIKey&customer_id=$customer_id&page=$($page)"
     $response = Invoke-RestMethod -Uri $uri
     $response = $response.ToString().Replace("AV", "_AV") | ConvertFrom-Json
     $response
     
 }
-
 ###Fnd All Syncro Customers##########
 Write-Host "Getting All Customers In Syncro"
 
@@ -112,11 +112,12 @@ foreach ($customer in $SyncroCustomers) {
     Write-Host "Getting All assets for $customername In Syncro"
 
     $page = 1
-    $totalPageCount = (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -page 1).meta.total_pages
+    $totalPageCount = (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -customer_id $customer_id -page 1).meta.total_pages
     $SyncroAssets = Do {
-        (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -page $page).assets
+        (Get-SyncroAssets -SyncroSubdomain $SyncroSubdomain -SyncroAPIKey $SyncroAPIKey -page $page -customer_id $customer_id).assets
         $page = $page + 1
     }Until ($page -gt $totalPageCount)
+    Write-Host $totalPageCount -BackgroundColor Red
     Write-Host "Found $($SyncroAssets.Count) assets in Syncro" -ForegroundColor Green
 
     foreach ($d in $data.assets) {
