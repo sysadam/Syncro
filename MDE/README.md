@@ -10,3 +10,5 @@ Upload the MMASetup-AMD64.exe to Syncro and apply it in the script to the Syncro
 
 ### MS Download link for MMASetup-AMD64
 https://download.microsoft.com/download/3/c/d/3cd6f5b3-3fbe-43c0-88e0-8256d02db5b7/MMASetup-AMD64.exe
+
+SHA256          6EF939A9CF03533B371D0B4FF8DC76615E1A12C740ACE9F30D887CEBB9C5DE4D
