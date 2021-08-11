@@ -1,0 +1,20 @@
+{
+    "Name": "RMM Applications",
+    "App": [
+        "kaseya",
+        "datto",
+        "solarwinds",
+        "ninja",
+        "GFI",
+        "atera",
+        "connectwise",
+        "continuum",
+        "ITSupport247",
+        "ITSPlatform"
+    ],
+    "Publisher": [
+        "datto",
+        "ITSupport247",
+        "ITSPlatform"
+    ]
+}
