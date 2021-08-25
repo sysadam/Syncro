@@ -1,42 +1,42 @@
 Import-Module $env:SyncroModule -WarningAction SilentlyContinue
 
+function DownloadFilesFromRepo {
+    Param(
+        [string]$Owner,
+        [string]$Repository,
+        [string]$Path
+    )
+    
+    $baseUri = "https://api.github.com/"
+    $args = "repos/$Owner/$Repository/contents/$Path"
+    $wr = Invoke-WebRequest -Uri $($baseuri + $args)
+    $objects = $wr.Content | ConvertFrom-Json
+    $files = $objects | where { $_.type -eq "file" } | Select -exp download_url
+    $directories = $objects | where { $_.type -eq "dir" }
+        
+    $directories | ForEach-Object { 
+        DownloadFilesFromRepo -Owner $Owner -Repository $Repository -Path $_.path -DestinationPath $($DestinationPath + $_.name)
+    }
+    
+    foreach ($file in $files) {
+        try {
+            $a = Invoke-WebRequest -Uri $file -ErrorAction Stop
+            $a.Content
+        }
+        catch {
+            throw "Unable to download '$($file.path)'"
+        }
+    }
+    
+}
+
 # For full functionality:
 # Create an 'Allowed Apps' customer custom field and asset custom field in Syncro Admin
 # Add Syncro platform script variables for $orgallowlist and $assetallowlist and link them to your custom fields
 
 # Application list arrays, you can add more if you want
-$security = @"
-[
-    "ahnlab",
-    "avast",
-    "avg",
-    "avira",
-    "bitdefender",
-    "checkpoint",
-    "clamwin",
-    "comodo",
-    "dr.web",
-    "eset ",
-    "fortinet",
-    "f-prot",
-    "f-secure",
-    "\bg data",
-    "immunet",
-    "kaspersky",
-    "mcafee",
-    "nano",
-    "norton",
-    "panda",
-    "qihoo 360",
-    "segurazo",
-    "sophos",
-    "symantec",
-    "trend micro",
-    "trustport",
-    "webroot",
-    "zonealarm"
-]
-"@ | ConvertFrom-Json
+$security = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/security.json" | ConvertFrom-Json
+$security
 
 $remoteaccess = @"
 [
