@@ -45,14 +45,14 @@ function Get-GitHubFiles {
 
 function Save-GitHubFiles {
     Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/JSON/" -DestinationPath "$env:Temp\PUP\"
-    #Get-ChildItem -Path "C:\GitRepos\Syncro\PUP" -Filter "*.json" | Copy-Item -Destination "C:\Users\Adam\AppData\Local\Temp\PUP" -Verbose -Force
+    #Get-ChildItem -Path "C:\GitRepos\Syncro\PUP" -Filter "*.json" | Copy-Item -Destination "$env:localAppData\Temp\PUP" -Verbose -Force
 }
 
 
 $tempPath = "$env:Temp\PUP\"
-$tempFiles = Get-ChildItem -Path "$tempPath" -Filter "*.json"
+$tempFiles = Get-ChildItem -Path "$tempPath" -Filter "*.json" -ea SilentlyContinue
 $limit = (Get-Date).AddDays(-2)
-$over24 = Get-ChildItem -Path "$tempPath" -Filter "*.json" | Where-Object { !$_.PSIsContainer -and $_.CreationTime -lt $limit }
+$over24 = Get-ChildItem -Path "$tempPath" -Filter "*.json" -ErrorAction SilentlyContinue| Where-Object { !$_.PSIsContainer -and $_.CreationTime -lt $limit }
 if ($NULL -eq $tempFiles) {
     Write-Host "Caching files"
     Save-GitHubFiles
@@ -97,9 +97,9 @@ $allowlist += ($assetallowlist -split ",").Trim()
 Write-Output "Allowed Apps at Asset Level: $assetallowlist"
 
 # Grab the registry uninstall keys to search against (x86 and x64)
-$software = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\" | Get-ItemProperty
+$software = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\" -ErrorAction SilentlyContinue| Get-ItemProperty
 if ([Environment]::Is64BitOperatingSystem) {
-    $software += Get-ChildItem "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\" | Get-ItemProperty
+    $software += Get-ChildItem "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\" -ErrorAction SilentlyContinue| Get-ItemProperty
 }
 
 # Clear the output variable so we don't get confused while testing
