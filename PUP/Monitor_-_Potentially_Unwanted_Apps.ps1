@@ -1,10 +1,11 @@
-Import-Module $env:SyncroModule -WarningAction SilentlyContinue
+#Import-Module $env:SyncroModule -WarningAction SilentlyContinue
 
-function DownloadFilesFromRepo {
+function Get-GitHubFiles {
     Param(
         [string]$Owner,
         [string]$Repository,
-        [string]$Path
+        [string]$Path,
+        [string]$DestinationPath
     )
     
     $baseUri = "https://api.github.com/"
@@ -18,10 +19,22 @@ function DownloadFilesFromRepo {
         DownloadFilesFromRepo -Owner $Owner -Repository $Repository -Path $_.path -DestinationPath $($DestinationPath + $_.name)
     }
     
-    foreach ($file in $files) {
+        
+    if (-not (Test-Path $DestinationPath)) {
+        # Destination path does not exist, let's create it
         try {
-            $a = Invoke-WebRequest -Uri $file -ErrorAction Stop
-            $a.Content
+            New-Item -Path $DestinationPath -ItemType Directory -ErrorAction Stop
+        }
+        catch {
+            throw "Could not create path '$DestinationPath'!"
+        }
+    }
+    
+    foreach ($file in $files) {
+        $fileDestination = Join-Path $DestinationPath (Split-Path $file -Leaf)
+        try {
+            Invoke-WebRequest -Uri $file -OutFile $fileDestination -ErrorAction Stop
+            "Grabbed '$($file)' to '$fileDestination'"
         }
         catch {
             throw "Unable to download '$($file.path)'"
@@ -30,22 +43,40 @@ function DownloadFilesFromRepo {
     
 }
 
-# For full functionality:
-# Create an 'Allowed Apps' customer custom field and asset custom field in Syncro Admin
-# Add Syncro platform script variables for $orgallowlist and $assetallowlist and link them to your custom fields
+function Save-GitHubFiles {
+    Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/JSON/" -DestinationPath "$env:Temp\PUP\"
+    #Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/remoteaccess.json" -DestinationPath "$env:Temp\PUP\"
+    #Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/rmm.json" -DestinationPath "$env:Temp\PUP\"
+    #Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/crapware.json" -DestinationPath "$env:Temp\PUP\"
+    #Get-GitHubFiles -Owner AdamNSTA -Repository Syncro -Path "/PUP/oem.json" -DestinationPath "$env:Temp\PUP\"
+    #Get-ChildItem -Path "C:\GitRepos\Syncro\PUP" -Filter "*.json" | Copy-Item -Destination "C:\Users\Adam\AppData\Local\Temp\PUP" -Verbose -Force
+}
 
-# Application list arrays, you can add more if you want
-Write-Host "Downloading JSON files from GitHub"
-$security = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/security.json" | ConvertFrom-Json
-$remoteaccess = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/remoteaccess.json" | ConvertFrom-Json
-$rmm = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/rmm.json" | ConvertFrom-Json
-$crapware = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/crapware.json" | ConvertFrom-Json
-# TRON 
-$oem = DownloadFilesFromRepo -Owner AdamNSTA -Repository Syncro -Path "/PUP/OEM.json" | ConvertFrom-Json
+
+$tempPath = "$env:Temp\PUP\"
+$tempFiles = Get-ChildItem -Path "$tempPath" -Filter "*.json"
+$limit = (Get-Date).AddDays(-2)
+$over24 = Get-ChildItem -Path "$tempPath" -Filter "*.json" | Where-Object { !$_.PSIsContainer -and $_.CreationTime -lt $limit }
+if ($NULL -eq $tempFiles) {
+    Write-Host "Caching files"
+    Save-GitHubFiles
+}
+elseif ($over24.Count -ne '0') {
+    $tempFiles |%{Remove-Item $_.FullName -Verbose -Force -Confirm:$false -ErrorAction Stop }
+    Write-Host "Files cached over 24 hours, redownloading"
+    Save-GitHubFiles
+}
+else {
+    Write-Host "Files already cached"
+}
+
+#grab lists from temporary files and declare variables.
+$tempFiles | ForEach-Object {
+    New-Variable -Name $_.BaseName -Value $(get-content $_.FullName | ConvertFrom-Json) -Force
+}
 
 # Combine our lists, if you create more lists be sure to add them here
 $apps = $security + $remoteaccess + $rmm + $crapware + $oem
-
 # Allowlist array, you must use the full name for the matching to work!
 $allowlist = @"
 [
@@ -93,5 +124,5 @@ if ($outputApps) {
 }
 else {
     Write-Host "No Apps Found."
-    Close-Rmm-Alert -Category "Potentially Unwanted Applications"
+    #Close-Rmm-Alert -Category "Potentially Unwanted Applications"
 }
