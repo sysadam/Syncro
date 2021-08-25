@@ -58,7 +58,7 @@ if ($NULL -eq $tempFiles) {
     Save-GitHubFiles
 }
 elseif ($over24.Count -ne '0') {
-    $tempFiles |%{Remove-Item $_.FullName -Verbose -Force -Confirm:$false -ErrorAction Stop }
+    $tempFiles | % { Remove-Item $_.FullName -Verbose -Force -Confirm:$false -ErrorAction Stop }
     Write-Host "Files cached over 24 hours, redownloading"
     Save-GitHubFiles
 }
@@ -90,11 +90,11 @@ $allowlist = @"
     "Dell Power Manager Service"
 ]
 "@ | ConvertFrom-Json
-Write-Host -ForegroundColor Yellow "Allowed Apps at Root Level: $allowlist"
-$allowlist += ($orgallowlist -split ",").Trim()
-Write-Output "Allowed Apps at Organization Level: $orgallowlist"
-$allowlist += ($assetallowlist -split ",").Trim()
-Write-Output "Allowed Apps at Asset Level: $assetallowlist"
+#Write-Host -ForegroundColor Yellow "Allowed Apps at Root Level: $allowlist"
+#$allowlist += ($orgallowlist -split ",").Trim()
+#Write-Output "Allowed Apps at Organization Level: $orgallowlist"
+#$allowlist += ($assetallowlist -split ",").Trim()
+#Write-Output "Allowed Apps at Asset Level: $assetallowlist"
 
 # Grab the registry uninstall keys to search against (x86 and x64)
 $software = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\" | Get-ItemProperty
@@ -110,15 +110,13 @@ $outputApps = foreach ($app in $apps) {
     $software | Where-Object { $_.DisplayName -match "$app" -and $allowlist -notcontains $_.DisplayName } | Select-Object @{N = "DisplayName"; E = { $_.DisplayName } }, @{N = "UninstallString"; E = { $_.UninstallString } }, @{N = "MatchingApp"; E = { $app } }
 }
 
+#$outputApps
 
-if ($outputApps) {
-    Write-Output "PUP Found:"
-    $report = ($outputApps | Select-Object -Unique) | Format-List | Out-String
-    Write-Output "Apps: $report"
-    #Rmm-Alert -Category 'Potentially Unwanted Applications' -Body "Apps Found: $report"
-    exit 1
-}
-else {
-    Write-Host "No Apps Found."
-    #Close-Rmm-Alert -Category "Potentially Unwanted Applications"
+$outputApps | Where-Object {$_.UninstallString -like "*MsiExec.exe*"} | Foreach-Object {
+    $name = $_.DisplayName
+    $string = $_.UninstallString
+    $string = $string -replace "MsiExec.exe /X"," "
+    Write-Host "Removing $name"
+    Start-Process "MsiExec.exe" -ArgumentList "/x $string /q" -Wait
+    Start-Sleep -Seconds 15
 }
