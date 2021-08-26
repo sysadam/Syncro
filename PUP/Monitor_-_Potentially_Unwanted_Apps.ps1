@@ -50,7 +50,7 @@ function Save-GitHubFiles {
 
 
 $tempPath = "$env:Temp\PUP\"
-$tempFiles = Get-ChildItem -Path "$tempPath" -Filter "*.json" -ea SilentlyContinue
+$tempFiles = Get-ChildItem -Path "$tempPath" -Filter "*.json" -ErrorAction SilentlyContinue
 $limit = (Get-Date).AddDays(-2)
 $over24 = Get-ChildItem -Path "$tempPath" -Filter "*.json" -ErrorAction SilentlyContinue| Where-Object { !$_.PSIsContainer -and $_.CreationTime -lt $limit }
 if ($NULL -eq $tempFiles) {
@@ -87,7 +87,8 @@ $allowlist = @"
     "Dell PointStick Driver",
     "Dell Command | Update",
     "Dell Touchpad",
-    "Dell Power Manager Service"
+    "Dell Power Manager Service",
+    "Lenovo Vantage Service"
 ]
 "@ | ConvertFrom-Json
 Write-Host -ForegroundColor Yellow "Allowed Apps at Root Level: $allowlist"
