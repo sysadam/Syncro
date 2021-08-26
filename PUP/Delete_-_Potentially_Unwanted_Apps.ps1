@@ -87,7 +87,8 @@ $allowlist = @"
     "Dell PointStick Driver",
     "Dell Command | Update",
     "Dell Touchpad",
-    "Dell Power Manager Service"
+    "Dell Power Manager Service",
+    "Lenovo Vantage Service"
 ]
 "@ | ConvertFrom-Json
 #Write-Host -ForegroundColor Yellow "Allowed Apps at Root Level: $allowlist"
@@ -112,11 +113,18 @@ $outputApps = foreach ($app in $apps) {
 
 #$outputApps
 
-$outputApps | Where-Object {$_.UninstallString -like "*MsiExec.exe*"} | Foreach-Object {
-    $name = $_.DisplayName
-    $string = $_.UninstallString
-    $string = $string -replace "MsiExec.exe /X"," "
-    Write-Host "Removing $name"
-    Start-Process "MsiExec.exe" -ArgumentList "/x $string /q" -Wait
-    Start-Sleep -Seconds 15
+if($outputApps.UninstallString -like "*MsiExec.exe*") {
+    $outputApps | Where-Object {$_.UninstallString -like "*MsiExec.exe*"} | Foreach-Object {
+        $name = $_.DisplayName
+        $string = $_.UninstallString
+        $string = $string -replace "MsiExec.exe /X"," "
+        Write-Host "Removing $name"
+        Start-Process "MsiExec.exe" -ArgumentList "/x $string /q" -Wait
+        Start-Sleep -Seconds 15
+    }
+} else {
+    $outputApps | Where-Object {$_.UninstallString -notcontains "*MsiExec.exe*"} | Foreach-Object {
+        Start-Process "$_.UninstallString" -Wait
+    }
 }
+
