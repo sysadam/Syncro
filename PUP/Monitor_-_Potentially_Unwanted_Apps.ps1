@@ -12,8 +12,8 @@ function Get-GitHubFiles {
     $args = "repos/$Owner/$Repository/contents/$Path"
     $wr = Invoke-WebRequest -Uri $($baseuri + $args)
     $objects = $wr.Content | ConvertFrom-Json
-    $files = $objects | where { $_.type -eq "file" } | Select -exp download_url
-    $directories = $objects | where { $_.type -eq "dir" }
+    $files = $objects | where-object { $_.type -eq "file" } | Select-object -exp download_url
+    $directories = $objects | where-object { $_.type -eq "dir" }
         
     $directories | ForEach-Object { 
         DownloadFilesFromRepo -Owner $Owner -Repository $Repository -Path $_.path -DestinationPath $($DestinationPath + $_.name)
@@ -58,7 +58,7 @@ if ($NULL -eq $tempFiles) {
     Save-GitHubFiles
 }
 elseif ($over24.Count -ne '0') {
-    $tempFiles |%{Remove-Item $_.FullName -Verbose -Force -Confirm:$false -ErrorAction Stop }
+    $tempFiles |%{Remove-Item $_.FullName -Verbose -Force -Confirm:$false -ErrorAction SilentlyContinue }
     Write-Host "Files cached over 24 hours, redownloading"
     Save-GitHubFiles
 }
