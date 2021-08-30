@@ -1,5 +1,5 @@
 function Get-ChromeExtension {
-<#
+    <#
  .SYNOPSIS
     Gets Chrome Extensions from a local or remote computer
  .DESCRIPTION
@@ -51,7 +51,7 @@ function Get-ChromeExtension {
                 [parameter(Position = 0)]
                 [IO.DirectoryInfo]$Folder
             )
-            BEGIN{
+            BEGIN {
 
                 $BuiltInExtensions = @{
                     'nmmhkkegccagdldgiimedpiccmgmieda' = 'Google Wallet'
@@ -65,9 +65,10 @@ function Get-ChromeExtension {
                 # Folder names match extension ID e.g. blpcfgokakmgnkcojhhkbfbldkacnbeo
                 $ExtID = $Folder.Name
 
-                if($Folder.FullName -match '\\Users\\(?<username>[^\\]+)\\'){
+                if ($Folder.FullName -match '\\Users\\(?<username>[^\\]+)\\') {
                     $Username = $Matches['username']
-                }else{
+                }
+                else {
                     $Username = ''
                 }
 
@@ -86,21 +87,23 @@ function Get-ChromeExtension {
                             $Title = $Manifest.name
                         }
                     }
-                } else {
+                }
+                else {
                     # Just use the folder name as the version
                     $Version = $LastestExtVersionInstallFolder.Name
                 }
 
-                if($BuiltInExtensions.ContainsKey($ExtID)){
+                if ($BuiltInExtensions.ContainsKey($ExtID)) {
                     # Built-in extensions do not appear in the Chrome Store
 
                     $Title = $BuiltInExtensions[$ExtID]
                     $Description = ''
 
-                }else{
+                }
+                else {
                     # Lookup the extension in the Store
                     $url = "https://chrome.google.com/webstore/detail/" + $ExtID + "?hl=en-us"
-
+                    <#
                     try {
                         # You may need to include proxy information
                         # $WebRequest = Invoke-WebRequest -Uri $url -ErrorAction Stop -Proxy 'http://proxy:port' -ProxyUseDefaultCredentials
@@ -114,10 +117,11 @@ function Get-ChromeExtension {
 
                                 $ExtTitle = $WebRequest.ParsedHtml.title
                                 if ($ExtTitle -match '\s-\s.*$') {
-                                    $Title = $ExtTitle -replace '\s-\s.*$',''
+                                    $Title = $ExtTitle -replace '\s-\s.*$', ''
                                     $extType = 'ChromeStore'
 
-                                } else {
+                                }
+                                else {
                                     $Title = $ExtTitle
                                 }
                             }
@@ -125,16 +129,17 @@ function Get-ChromeExtension {
                             # Screen scrape the Description meta-data
                             $Description = $webRequest.AllElements.InnerHTML | Where-Object { $_ -match '<meta name="Description" content="([^"]+)">' } | Select-object -First 1 | ForEach-Object { $Matches[1] }
                         }
-                    } catch {
+                    }
+                    catch {
                         Write-Warning "Error during webstore lookup for '$ExtID' - '$_'"
 
-                    }
+                    }#>
                 }
 
                 [PSCustomObject][Ordered]@{
                     Name        = $Title
                     Version     = $Version
-                    Description = $Description
+                    #Description = $Description
                     Username    = $Username
                     ID          = $ExtID
                 }
@@ -147,40 +152,64 @@ function Get-ChromeExtension {
     }
 
     PROCESS {
-        Foreach ($Computer in $Computername) {
+        # Get profile list from Chromes local state
+        $statePath = "C:\Users\${env:USERNAME}\AppData\Local\Google\Chrome\User Data\Local State"
+        $state = Get-Content $statePath
 
-            if ($Username) {
-                # Single userprofile
-                $Path = Join-path -path "fileSystem::\\$Computer\C$\Users\$Username" -ChildPath $ExtensionFolderPath
-                $Extensions = Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue
+        # Using Serializer instead of ConvertFrom-Json because https://github.com/PowerShell/PowerShell/issues/1755
+        [void][System.Reflection.Assembly]::LoadWithPartialName('System.Web.Extensions')
+        $jsser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+        $jsser.MaxJsonLength = $jsser.MaxJsonLength * 10
 
-            } else {
-                # All user profiles that contain this a Chrome extensions folder
-                $Path = Join-path -path "fileSystem::\\$Computer\C$\Users\*" -ChildPath $ExtensionFolderPath
-                $Extensions =@()
-                Get-Item -Path $Path -ErrorAction SilentlyContinue | ForEach-Object{
+        $serProfiles = $jsser.DeserializeObject($state).profile.info_cache
 
-                    $Extensions += Get-ChildItem -Path $_ -Directory -ErrorAction SilentlyContinue
-                }
-
+        $profiles = @()
+        $serProfiles.Keys.ForEach{
+            $profile = New-Object -TypeName psobject -Property @{
+                'Id' = $_
             }
+            $profiles += $profile
+        }
 
-            if (-not($null -eq $Extensions)) {
-
-                Foreach ($Extension in $Extensions) {
-
-                    $Output = Get-ExtensionInfo -Folder $Extension
-                    $Output | Add-Member -MemberType NoteProperty -Name 'Computername' -Value $Computer
-                    $Output
-
+        Foreach ($p in $profiles) {
+            $ExtensionFolderPath = "AppData\Local\Google\Chrome\User Data\$($p.id)\Extensions"
+            Foreach ($Computer in $Computername) {
+                if ($Username) {
+                    # Single userprofile
+                    $Path = Join-path -path "fileSystem::\\$Computer\C$\Users\$Username" -ChildPath $ExtensionFolderPath
+                    $Extensions = Get-ChildItem -Path $Path -Directory -ErrorAction SilentlyContinue
+    
                 }
-
-            } else {
-                Write-Warning "$Computer : no extensions were found"
-
-            }
-
-        }#foreach
+                else {
+                    # All user profiles that contain this a Chrome extensions folder
+                    $Path = Join-path -path "fileSystem::\\$Computer\C$\Users\*" -ChildPath $ExtensionFolderPath
+                    $Extensions = @()
+                    Get-Item -Path $Path -ErrorAction SilentlyContinue | ForEach-Object {
+    
+                        $Extensions += Get-ChildItem -Path $_ -Directory -ErrorAction SilentlyContinue
+                    }
+    
+                }
+    
+                if (-not($null -eq $Extensions)) {
+    
+                    Foreach ($Extension in $Extensions) {
+    
+                        $Output = Get-ExtensionInfo -Folder $Extension
+                        $Output | Add-Member -MemberType NoteProperty -Name 'Computername' -Value $Computer
+                        $Output | Add-Member -MemberType NoteProperty -Name 'Profile' -Value $p.id
+                        $Output
+    
+                    }
+    
+                }
+                else {
+                    Write-Warning "$Computer : no extensions were found"
+    
+                }
+    
+            }#foreach
+        }
     }
 }
 
